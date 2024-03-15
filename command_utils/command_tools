@@ -1,0 +1,47 @@
+import subprocess
+import psutil
+import time
+# generate args according to the args_dict_list
+def args_to_command_line(args_dict):
+    command_line = ""
+    for key, value in args_dict.items():
+        command_line += f'--{key} {value} '
+    return command_line
+
+def run_command_lines_and_monitor(command_lines, std_file_list=[]):
+    if len(std_file_list) == 0:
+        std_file_list = [None] * len(command_lines)
+    process_list = []
+    for i in range(len(command_lines)):
+        if std_file_list[i] is None:
+            process_list.append(subprocess.Popen(command_lines[i]).split( ))
+        else:
+            process_list.append(subprocess.Popen(command_lines[i].split( ), stdout=(open(std_file_list[i], 'w')), stderr=subprocess.STDOUT))
+        time.sleep(10)
+    # monitor
+    while True:
+        time.sleep(10)
+        for i in range(len(process_list)):
+            process_obj = process_list[i]
+            if process_list[i].poll() is not None:
+                print(f'process {i} : {process_obj.pid} finished')
+                if std_file_list[i] is None:
+                    process_list[i] = subprocess.Popen(command_lines[i].split( ))
+                else:
+                    process_list[i] = subprocess.Popen(command_lines[i].split( ), stdout=(open(std_file_list[i], 'w')), stderr=subprocess.STDOUT)
+                time.sleep(10)
+            else:
+                process_obj = psutil.Process(process_list[i].pid)
+                memory_info = process_obj.memory_info()
+                print(f"process {i} : {process_obj.pid} is running, memory usage: {memory_info.rss / 1024 / 1024 /1024} GB")
+
+        # 获取系统内存信息
+        mem = psutil.virtual_memory()
+
+        # 打印剩余内存量
+        print(f"剩余内存: {mem.available / 1024 / 1024 /1024} GB")
+
+        time.sleep(5)
+        if all([process.poll() is not None for process in process_list]):
+            break
+    print('all processes finished')
